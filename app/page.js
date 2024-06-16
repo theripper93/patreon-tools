@@ -137,6 +137,7 @@ export default function Home() {
                                             subscribersPerDay[key].subscribers++;
                                             subscribersPerDay[key].gross += earnedGross;
                                         }
+                                        if(subscribersPerDay[key].gross < 0) subscribersPerDay[key].gross = 0;
                                     });
                                     const subscribersPerDayChart = Object.values(subscribersPerDay)
                                         .map((subscriber) => {
