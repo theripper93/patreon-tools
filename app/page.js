@@ -16,11 +16,17 @@ export default function Home() {
     const [insightsCSV, setInsightsCSV] = useState({ headers: [], data: [], chart: [] });
     const [insightsTableHeadersChecked, setInsightsTableHeadersChecked] = useState(["Your total earnings"]);
     const [detailedEarningsCSV, setDetailedEarningsCSV] = useState({ headers: [], data: [], chart: [], subscribersPerDayChart: [] });
-    const [dateRange, setDateRange] = useState("all");
+    const [dateRange, setDateRange] = useState("this-month");
+    const [excludeFirstDayOfMonth, setExcludeFirstDayOfMonth] = useState(true);
+    const [compareMode, setCompareMode] = useState(true);
 
     const dateFilter = (subscriber) => {
         const year = subscriber.year;
         const month = subscriber.month;
+        const day = subscriber.day;
+        if (Number.isFinite(day) && excludeFirstDayOfMonth && day === 1) {
+            return false;
+        }
 
         const current = new Date();
         const lastMonth = new Date(current.getFullYear(), current.getMonth() - 1, current.getDate());
@@ -33,7 +39,7 @@ export default function Home() {
         } else if (dateRange === "this-month") {
             return year === current.getFullYear() && month === current.getMonth();
         } else if (dateRange === "last-month") {
-            return year === lastMonth.getFullYear() && (month === lastMonth.getMonth());
+            return year === lastMonth.getFullYear() && month === lastMonth.getMonth();
         } else if (dateRange === "last-2-months") {
             return year === last2Months.getFullYear() && (month === lastMonth.getMonth() || month === current.getMonth());
         } else if (dateRange === "last-3-months") {
@@ -134,7 +140,11 @@ export default function Home() {
                                     });
                                     const subscribersPerDayChart = Object.values(subscribersPerDay)
                                         .map((subscriber) => {
-                                            return { ...subscriber, gross: subscriber.gross.toFixed(2) };
+                                            const year = subscriber.year;
+                                            const month = subscriber.month;
+                                            const day = subscriber.day;
+                                            const lastMonthSubscriber = Object.values(subscribersPerDay).find((subscriber) => subscriber.year === year && subscriber.month === month - 1 && subscriber.day === day);
+                                            return { ...subscriber, gross: subscriber.gross.toFixed(2), lastMonthSubscribers: lastMonthSubscriber ? lastMonthSubscriber.subscribers : 0, lastMonthGross: lastMonthSubscriber ? lastMonthSubscriber.gross.toFixed(2) : 0 };
                                         })
                                         .reverse();
                                     setDetailedEarningsCSV({ headers, data, chart, subscribersPerDayChart });
@@ -168,6 +178,26 @@ export default function Home() {
                         </SelectContent>
                     </Select>
                 </div>
+
+                <div className='grid grid-cols-2 items-center space-x-2 w-full'>
+                    <Label>Exclude First Day of Month</Label>
+                    <Checkbox
+                        checked={excludeFirstDayOfMonth}
+                        onCheckedChange={(checked) => {
+                            setExcludeFirstDayOfMonth(checked);
+                        }}
+                    />
+                </div>
+
+                <div className='grid grid-cols-2 items-center space-x-2 w-full'>
+                    <Label>Compare Mode</Label>
+                    <Checkbox
+                        checked={compareMode}
+                        onCheckedChange={(checked) => {
+                            setCompareMode(checked);
+                        }}
+                    />
+                </div>
             </div>
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && (
@@ -176,8 +206,10 @@ export default function Home() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type='monotone' dataKey='subscribers' key='subscribers' stroke='#8884d8' />
-                    <Line type='monotone' dataKey='gross' key='gross' stroke='#82ca9d' />
+                    <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
+                    {compareMode && <Line type='monotone' dataKey='lastMonthSubscribers' name='Subscribers (prev. Month)' key='lastMonthSubscribers' stroke='#ebba34' />}
+                    <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' />
+                    {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' />}
                 </LineChart>
             )}
 
