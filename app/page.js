@@ -18,7 +18,7 @@ export default function Home() {
     const [detailedEarningsCSV, setDetailedEarningsCSV] = useState({ headers: [], data: [], chart: [], subscribersPerDayChart: [] });
     const [dateRange, setDateRange] = useState("this-month");
     const [excludeFirstDayOfMonth, setExcludeFirstDayOfMonth] = useState(true);
-    const [compareMode, setCompareMode] = useState(true);
+    const [compareMode, setCompareMode] = useState(false);
 
     const dateFilter = (subscriber) => {
         const year = subscriber.year;
@@ -137,7 +137,6 @@ export default function Home() {
                                             subscribersPerDay[key].subscribers++;
                                             subscribersPerDay[key].gross += earnedGross;
                                         }
-                                        if(subscribersPerDay[key].gross < 0) subscribersPerDay[key].gross = 0;
                                     });
                                     const subscribersPerDayChart = Object.values(subscribersPerDay)
                                         .map((subscriber) => {
@@ -145,7 +144,11 @@ export default function Home() {
                                             const month = subscriber.month;
                                             const day = subscriber.day;
                                             const lastMonthSubscriber = Object.values(subscribersPerDay).find((subscriber) => subscriber.year === year && subscriber.month === month - 1 && subscriber.day === day);
-                                            return { ...subscriber, gross: subscriber.gross.toFixed(2), lastMonthSubscribers: lastMonthSubscriber ? lastMonthSubscriber.subscribers : 0, lastMonthGross: lastMonthSubscriber ? lastMonthSubscriber.gross.toFixed(2) : 0 };
+                                            const lastMonthGross = lastMonthSubscriber ? lastMonthSubscriber.gross : 0;
+                                            const lastMonthSubscribers = lastMonthSubscriber ? lastMonthSubscriber.subscribers : 0;
+                                            const grossDelta = (subscriber.gross - lastMonthGross).toFixed(2);
+                                            const subscribersDelta = subscriber.subscribers - lastMonthSubscribers;
+                                            return { ...subscriber, gross: subscriber.gross.toFixed(2), lastMonthSubscribers, lastMonthGross: lastMonthGross.toFixed(2), grossDelta, subscribersDelta };
                                         })
                                         .reverse();
                                     setDetailedEarningsCSV({ headers, data, chart, subscribersPerDayChart });
@@ -204,20 +207,25 @@ export default function Home() {
             {!!detailedEarningsCSV.subscribersPerDayChart.length && (
                 <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <XAxis dataKey='date' />
-                    <YAxis />
+                    <YAxis type="number" domain={[
+                        Math.min(0,Math.round(Math.min(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 - 1) * 100),
+                        Math.round(Math.max(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 + 1) * 100,
+                    ]} />
                     <Tooltip />
                     <Legend />
                     <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
                     {compareMode && <Line type='monotone' dataKey='lastMonthSubscribers' name='Subscribers (prev. Month)' key='lastMonthSubscribers' stroke='#ebba34' />}
+                    {compareMode && <Line type='monotone' dataKey='subscribersDelta' name='Subscribers Delta' key='subscribersDelta' stroke='#4d401e' />}
                     <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' />
                     {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' />}
+                    {compareMode && <Line type='monotone' dataKey='grossDelta' name='Gross Earnings Delta' key='grossDelta' stroke='#1e4d49' />}
                 </LineChart>
             )}
 
             {!!insightsCSV.chart.length && (
                 <LineChart id='insights' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={insightsCSV.chart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <XAxis dataKey='MonthYear' />
-                    <YAxis />
+                    <YAxis type="number" />
                     <Tooltip />
                     <Legend />
                     {insightsTableHeadersChecked.map((header) => (
