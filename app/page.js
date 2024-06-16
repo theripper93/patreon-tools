@@ -171,7 +171,7 @@ export default function Home() {
             </div>
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && (
-                <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.5} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <XAxis dataKey='date' />
                     <YAxis />
                     <Tooltip />
@@ -182,7 +182,7 @@ export default function Home() {
             )}
 
             {!!insightsCSV.chart.length && (
-                <LineChart id='insights' width={window.innerWidth * 0.9} height={window.innerHeight * 0.5} data={insightsCSV.chart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart id='insights' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={insightsCSV.chart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <XAxis dataKey='MonthYear' />
                     <YAxis />
                     <Tooltip />
