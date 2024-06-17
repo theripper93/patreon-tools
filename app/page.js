@@ -67,7 +67,6 @@ export default function Home() {
             .filter((subscriber) => subscriber.day <= 30 - daysUntilEndOfMonth)
             .map((subscriber) => parseFloat(subscriber.gross))
             .reduce((a, b) => a + b, 0);
-        debugger
         const topTwoGrossLastMonth = lastMonthData.sort((a, b) => b.gross - a.gross).slice(0, 2).map((subscriber) => parseFloat(subscriber.gross)).reduce((a, b) => a + b, 0);
         const estimatedGrossLastMonth = topTwoGrossLastMonth + medianDailyGrossLastMonth * 28;
         const specialEventImpact = lastMonthGross - estimatedGrossLastMonth;
