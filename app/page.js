@@ -240,7 +240,7 @@ export default function Home() {
             {!!detailedEarningsCSV.subscribersPerDayChart.length && dateRange === "this-month" && (
                 <div className='flex flex-row justify-center items-center align-middle w-full gap-5 pt-4'>
                     <Badge>
-                        Last Month: {currency}
+                        Today Last Month: {currency}
                         {getMonthlyGrossAndProjected().grossThisTimeLastMonth.toFixed(0)}
                     </Badge>
                     <Badge>
