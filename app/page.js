@@ -67,7 +67,13 @@ export default function Home() {
             .filter((subscriber) => subscriber.day <= 30 - daysUntilEndOfMonth)
             .map((subscriber) => parseFloat(subscriber.gross))
             .reduce((a, b) => a + b, 0);
-        return { currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth };
+        debugger
+        const topTwoGrossLastMonth = lastMonthData.sort((a, b) => b.gross - a.gross).slice(0, 2).map((subscriber) => parseFloat(subscriber.gross)).reduce((a, b) => a + b, 0);
+        const estimatedGrossLastMonth = topTwoGrossLastMonth + medianDailyGrossLastMonth * 28;
+        const specialEventImpact = lastMonthGross - estimatedGrossLastMonth;
+
+
+        return { currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact };
     };
     //https://www.patreon.com/dashboard/creator-analytics-detailed-earnings.csv
     return (
@@ -239,7 +245,11 @@ export default function Home() {
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && dateRange === "this-month" && (
                 <div className='flex flex-row justify-center items-center align-middle w-full gap-5 pt-4'>
-                    <Badge>
+                    <Badge variant="secondary">
+                        Special Event Impact Last Month: {currency}
+                        {getMonthlyGrossAndProjected().specialEventImpact.toFixed(0)}
+                    </Badge>
+                    <Badge variant="secondary">
                         Today Last Month: {currency}
                         {getMonthlyGrossAndProjected().grossThisTimeLastMonth.toFixed(0)}
                     </Badge>
@@ -251,7 +261,7 @@ export default function Home() {
                         Projected Gross: {currency}
                         {getMonthlyGrossAndProjected().projectedGross.toFixed(0)}
                     </Badge>
-                    <Badge>
+                    <Badge variant="outline">
                         VS Last Month:
                         <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().vsLastMonth > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonth.toFixed(2)}%
