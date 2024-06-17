@@ -288,7 +288,6 @@ export default function Home() {
             )}
 
             <Table>
-                <TableCaption>Insights</TableCaption>
                 <TableHeader>
                     <TableRow>
                         {insightsCSV.headers.map((header) => (
