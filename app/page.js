@@ -71,8 +71,35 @@ export default function Home() {
         const estimatedGrossLastMonth = topTwoGrossLastMonth + medianDailyGrossLastMonth * 28;
         const specialEventImpact = lastMonthGross - estimatedGrossLastMonth;
 
+        const grossByMonthYear = {};
+        detailedEarningsCSV.subscribersPerDayChart.forEach((subscriber) => {
+            const month = subscriber.month;
+            const year = subscriber.year;
+            const key = `${year}-${month}`;
+            if (!grossByMonthYear[key]) {
+                grossByMonthYear[key] = parseFloat(subscriber.gross);
+            }else{
+                grossByMonthYear[key] += parseFloat(subscriber.gross);
+            }
+        });
 
-        return { currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact };
+        const monthByMonthGrowth = [];
+
+        Object.values(grossByMonthYear).forEach((gross, index) => {
+            const current = gross;
+            const prev = Object.values(grossByMonthYear)[index - 1];
+            if (!prev) return;
+            const growth = (current) / prev - 1;
+            monthByMonthGrowth.push(growth);
+        });
+
+        const medianGrowth = findMedian(monthByMonthGrowth);
+
+        const projectedGrossUpper = (projectedGross + currentMonthGross) * (1 + medianGrowth);
+
+        const vsLastMonthUpper = (projectedGrossUpper / lastMonthGross - 1) * 100;
+
+        return { currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact, projectedGrossUpper, vsLastMonthUpper, medianGrowth: medianGrowth * 100 };
     };
     //https://www.patreon.com/dashboard/creator-analytics-detailed-earnings.csv
     return (
@@ -159,7 +186,7 @@ export default function Home() {
                                                     const month = date.getMonth();
                                                     const year = date.getFullYear();
                                                     const key = `${year}-${month + 1}-${day}`;
-                                                    const earnedGross = parseFloat(row["Creator share"] || 0) + parseFloat(row["Creator platform fee"] || 0) + parseFloat(row["Creator payment processing fee"] || 0);
+                                                    const earnedGross = parseFloat(row["Creator share"] || 0) + parseFloat(row["Creator platform fee"] || 0) + parseFloat(row["Creator payment processing fee"] || 0) + parseFloat(row["Creator currency conversion fee"] || 0);
                                                     if (!subscribersPerDay[key]) {
                                                         subscribersPerDay[key] = { subscribers: 1, day: day, month: month, year: year, date: key, gross: earnedGross };
                                                     } else {
@@ -252,18 +279,26 @@ export default function Home() {
                         Today Last Month: {currency}
                         {getMonthlyGrossAndProjected().grossThisTimeLastMonth.toFixed(0)}
                     </Badge>
+                    <Badge variant="secondary">
+                        Median Growth: <span className='ml-1' style={{color: getMonthlyGrossAndProjected().medianGrowth > 0 ? "lime" : "red"}}>{getMonthlyGrossAndProjected().medianGrowth.toFixed(2)}%
+                        </span>
+                    </Badge>
                     <Badge>
                         Gross: <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().grossThisTimeLastMonth < getMonthlyGrossAndProjected().currentMonthGross ? "green" : "red" }}>{currency}{getMonthlyGrossAndProjected().currentMonthGross.toFixed(0)}</span>
                     </Badge>
 
                     <Badge>
                         Projected Gross: {currency}
-                        {getMonthlyGrossAndProjected().projectedGross.toFixed(0)}
+                        {getMonthlyGrossAndProjected().projectedGross.toFixed(0)} - {currency}{getMonthlyGrossAndProjected().projectedGrossUpper.toFixed(0)}
                     </Badge>
                     <Badge variant="outline">
                         VS Last Month:
                         <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().vsLastMonth > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonth.toFixed(2)}%
+                        </span>
+                        <span className="mx-1">-</span>
+                        <span className='' style={{ color: getMonthlyGrossAndProjected().vsLastMonthUpper > 0 ? "lime" : "red" }}>
+                            {getMonthlyGrossAndProjected().vsLastMonthUpper.toFixed(2)}%
                         </span>
                     </Badge>
                 </div>
@@ -349,6 +384,7 @@ const stringToColour = (str) => {
 };
 
 function findMedian(arr) {
+    arr = arr.map(v => parseFloat(v));
     arr.sort((a, b) => a - b);
     const middleIndex = Math.floor(arr.length / 2);
 
