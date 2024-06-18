@@ -3,20 +3,29 @@
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import {Checkbox} from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useState } from "react";
-import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Area, AreaChart, Bar, BarChart, ReferenceLine } from "recharts";
 import { useTheme } from "next-themes";
+
+const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const CURRENCY_MAP = {
+    "EUR": "€",
+    "USD": "$",
+    "GBP": "£",
+    "JPY": "¥",
+    "₩": "₩",
+};
 
 export default function Home() {
     const { setTheme } = useTheme("dark");
-    const [currency, setCurrency] = useState("€");
-    const [insightsCSV, setInsightsCSV] = useState({ headers: [], data: [], chart: [] });
-    const [insightsTableHeadersChecked, setInsightsTableHeadersChecked] = useState(["Your total earnings"]);
+    const [currency, setCurrency] = useState("$");
     const [detailedEarningsCSV, setDetailedEarningsCSV] = useState({ headers: [], data: [], chart: [], subscribersPerDayChart: [] });
     const [dateRange, setDateRange] = useState("this-month");
     const [excludeFirstDayOfMonth, setExcludeFirstDayOfMonth] = useState(true);
@@ -67,7 +76,11 @@ export default function Home() {
             .filter((subscriber) => subscriber.day <= 30 - daysUntilEndOfMonth)
             .map((subscriber) => parseFloat(subscriber.gross))
             .reduce((a, b) => a + b, 0);
-        const topTwoGrossLastMonth = lastMonthData.sort((a, b) => b.gross - a.gross).slice(0, 2).map((subscriber) => parseFloat(subscriber.gross)).reduce((a, b) => a + b, 0);
+        const topTwoGrossLastMonth = lastMonthData
+            .sort((a, b) => b.gross - a.gross)
+            .slice(0, 2)
+            .map((subscriber) => parseFloat(subscriber.gross))
+            .reduce((a, b) => a + b, 0);
         const estimatedGrossLastMonth = topTwoGrossLastMonth + medianDailyGrossLastMonth * 28;
         const specialEventImpact = lastMonthGross - estimatedGrossLastMonth;
 
@@ -78,7 +91,7 @@ export default function Home() {
             const key = `${year}-${month}`;
             if (!grossByMonthYear[key]) {
                 grossByMonthYear[key] = parseFloat(subscriber.gross);
-            }else{
+            } else {
                 grossByMonthYear[key] += parseFloat(subscriber.gross);
             }
         });
@@ -89,7 +102,7 @@ export default function Home() {
             const current = gross;
             const prev = Object.values(grossByMonthYear)[index - 1];
             if (!prev) return;
-            const growth = (current) / prev - 1;
+            const growth = current / prev - 1;
             monthByMonthGrowth.push(growth);
         });
 
@@ -99,7 +112,56 @@ export default function Home() {
 
         const vsLastMonthUpper = (projectedGrossUpper / lastMonthGross - 1) * 100;
 
-        return { currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact, projectedGrossUpper, vsLastMonthUpper, medianGrowth: medianGrowth * 100 };
+        const allTimeGrowth = Object.entries(grossByMonthYear).map(([key, value]) => {
+            return {
+                date: new Date(key.replaceAll("-", "/")).toLocaleDateString("en-US", { year: "numeric", month: "long" }),
+                gross: value.toFixed(0)
+            }
+        });
+
+        allTimeGrowth.forEach((g, i) => {
+            const prev = allTimeGrowth[i - 1];
+            if (!prev || !allTimeGrowth[i - 2] || !allTimeGrowth[i - 3]) {
+                g.percentageGrowth = 0;
+                return;
+            }
+            g.percentageGrowth = ((g.gross / prev.gross - 1) * 100).toFixed(2);
+        })
+
+        return { allTimeGrowth, currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact, projectedGrossUpper, vsLastMonthUpper, medianGrowth: medianGrowth * 100 };
+    };
+
+    const getDayOfWeekSubscriberDistribution = () => {
+        const data = detailedEarningsCSV.subscribersPerDayChart;
+        const dayOfWeekDistribution = {};
+        data.forEach((subscriber) => {
+            const year = subscriber.year;
+            const month = subscriber.month;
+            const day = subscriber.day;
+            const date = new Date(year, month, day);
+            const dayOfWeek = date.getDay();
+            const dayKey = DAYS_OF_WEEK[dayOfWeek];
+            if (!dayKey) return;
+
+            const isFirstDayOfMonth = day === 1 || day === 2;
+            if (isFirstDayOfMonth) return;
+            if (!dayOfWeekDistribution[dayKey]) {
+                dayOfWeekDistribution[dayKey] = subscriber.subscribers;
+            } else {
+                dayOfWeekDistribution[dayKey] += subscriber.subscribers;
+            }
+        });
+        const totalSubscribers = Object.values(dayOfWeekDistribution).reduce((a, b) => a + b, 0);
+
+        const chartData = [];
+
+        DAYS_OF_WEEK.forEach((dayOfWeek) => {
+            const dayOfWeekSubscribers = dayOfWeekDistribution[dayOfWeek];
+            const percent = (dayOfWeekSubscribers / totalSubscribers) * 100;
+            chartData.push({ dayOfWeek, dayOfWeekSubscribers, percent: percent.toFixed(1) });
+        });
+
+        return chartData;
     };
     //https://www.patreon.com/dashboard/creator-analytics-detailed-earnings.csv
     return (
@@ -107,48 +169,6 @@ export default function Home() {
             <Table>
                 <TableBody>
                     <TableRow>
-                        <TableCell>
-                            <div className='flex items-center flex-col gap-4'>
-                                <Label>
-                                    Upload{" "}
-                                    <Link style={{ color: "orange", cursor: "pointer" }} href='https://www.patreon.com/dashboard/creator-analytics-earnings.csv' target='_blank'>
-                                        Insights CSV file
-                                    </Link>
-                                </Label>
-                                <Input
-                                    type='file'
-                                    accept='.csv'
-                                    onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = (e) => {
-                                                const csv = e.target.result;
-                                                const lines = csv.split("\n");
-                                                const headers = lines[0].split(",");
-                                                const data = lines.slice(1).map((line) => line.split(","));
-                                                const chart = data.map((row) => {
-                                                    const dataPoint = {};
-                                                    for (let i = 0; i < row.length; i++) {
-                                                        if (headers[i] === "Month") {
-                                                            dataPoint["MonthYear"] = row[i];
-                                                        } else {
-                                                            dataPoint[headers[i]] = parseFloat(row[i]);
-                                                        }
-                                                    }
-                                                    const [year, month] = row[0].split("-").map((value) => parseInt(value));
-                                                    dataPoint.year = year;
-                                                    dataPoint.month = month - 1;
-                                                    return dataPoint;
-                                                });
-                                                setInsightsCSV({ headers, data, chart });
-                                            };
-                                            reader.readAsText(file);
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </TableCell>
                         <TableCell>
                             <div className='flex items-center flex-col gap-4'>
                                 <Label>
@@ -178,6 +198,9 @@ export default function Home() {
                                                     return dataPoint;
                                                 });
 
+                                                const currency = chart.find(r => r["Creator currency"])?.["Creator currency"];
+                                                if(CURRENCY_MAP[currency]) setCurrency(CURRENCY_MAP[currency]);
+
                                                 const subscribersPerDay = {};
                                                 chart.forEach((row) => {
                                                     const date = new Date(row.Date);
@@ -185,6 +208,7 @@ export default function Home() {
                                                     const day = date.getDate();
                                                     const month = date.getMonth();
                                                     const year = date.getFullYear();
+                                                    if(Number.isNaN(day) || Number.isNaN(month) || Number.isNaN(year)) return;
                                                     const key = `${year}-${month + 1}-${day}`;
                                                     const earnedGross = parseFloat(row["Creator share"] || 0) + parseFloat(row["Creator platform fee"] || 0) + parseFloat(row["Creator payment processing fee"] || 0) + parseFloat(row["Creator currency conversion fee"] || 0);
                                                     if (!subscribersPerDay[key]) {
@@ -194,6 +218,7 @@ export default function Home() {
                                                         subscribersPerDay[key].gross += earnedGross;
                                                     }
                                                 });
+
                                                 const subscribersPerDayChart = Object.values(subscribersPerDay)
                                                     .map((subscriber) => {
                                                         const year = subscriber.year;
@@ -207,6 +232,7 @@ export default function Home() {
                                                         return { ...subscriber, gross: subscriber.gross.toFixed(2), lastMonthSubscribers, lastMonthGross: lastMonthGross.toFixed(2), grossDelta, subscribersDelta };
                                                     })
                                                     .reverse();
+                                                    subscribersPerDayChart.forEach(s => s.date = new Date(s.date.replaceAll("-", "/")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }));
                                                 setDetailedEarningsCSV({ headers, data, chart, subscribersPerDayChart });
                                             };
                                             reader.readAsText(file);
@@ -245,7 +271,7 @@ export default function Home() {
                         <TableCell>
                             <div className='flex items-center flex-col gap-4'>
                                 <Label>Exclude First Day of Month</Label>
-                                <Checkbox
+                                <Switch
                                     checked={excludeFirstDayOfMonth}
                                     onCheckedChange={(checked) => {
                                         setExcludeFirstDayOfMonth(checked);
@@ -257,7 +283,7 @@ export default function Home() {
                         <TableCell>
                             <div className='flex items-center flex-col gap-4'>
                                 <Label>Compare Mode</Label>
-                                <Checkbox
+                                <Switch
                                     checked={compareMode}
                                     onCheckedChange={(checked) => {
                                         setCompareMode(checked);
@@ -265,38 +291,68 @@ export default function Home() {
                                 />
                             </div>
                         </TableCell>
+
+                        <TableCell>
+                            <div className='flex items-center flex-col gap-4'>
+                                <Label>Currency</Label>
+                                <Select
+                                    value={currency}
+                                    onValueChange={(value) => {
+                                        setCurrency(value);
+                                    }}
+                                >
+                                    <SelectTrigger className='w-[180px]'>
+                                        <SelectValue placeholder='Select a currency' />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value='€'>€</SelectItem>
+                                        <SelectItem value='$'>$</SelectItem>
+                                        <SelectItem value='£'>£</SelectItem>
+                                        <SelectItem value='¥'>¥</SelectItem>
+                                        <SelectItem value='₩'>₩</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && dateRange === "this-month" && (
-                <div className='flex flex-row justify-center items-center align-middle w-full gap-5 pt-4'>
-                    <Badge variant="secondary">
+                <div className='flex flex-row justify-center items-center align-middle w-full gap-5 my-2 mb-4'>
+                    <Badge variant='secondary'>
                         Special Event Impact Last Month: {currency}
                         {getMonthlyGrossAndProjected().specialEventImpact.toFixed(0)}
                     </Badge>
-                    <Badge variant="secondary">
+                    <Badge variant='secondary'>
                         Today Last Month: {currency}
                         {getMonthlyGrossAndProjected().grossThisTimeLastMonth.toFixed(0)}
                     </Badge>
-                    <Badge variant="secondary">
-                        Median Growth: <span className='ml-1' style={{color: getMonthlyGrossAndProjected().medianGrowth > 0 ? "lime" : "red"}}>{getMonthlyGrossAndProjected().medianGrowth.toFixed(2)}%
+                    <Badge variant='secondary'>
+                        Median Growth:{" "}
+                        <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().medianGrowth > 0 ? "lime" : "red" }}>
+                            {getMonthlyGrossAndProjected().medianGrowth.toFixed(2)}%
                         </span>
                     </Badge>
                     <Badge>
-                        Gross: <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().grossThisTimeLastMonth < getMonthlyGrossAndProjected().currentMonthGross ? "green" : "red" }}>{currency}{getMonthlyGrossAndProjected().currentMonthGross.toFixed(0)}</span>
+                        Gross:{" "}
+                        <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().grossThisTimeLastMonth < getMonthlyGrossAndProjected().currentMonthGross ? "green" : "red" }}>
+                            {currency}
+                            {getMonthlyGrossAndProjected().currentMonthGross.toFixed(0)}
+                        </span>
                     </Badge>
 
                     <Badge>
                         Projected Gross: {currency}
-                        {getMonthlyGrossAndProjected().projectedGross.toFixed(0)} - {currency}{getMonthlyGrossAndProjected().projectedGrossUpper.toFixed(0)}
+                        {getMonthlyGrossAndProjected().projectedGross.toFixed(0)} - {currency}
+                        {getMonthlyGrossAndProjected().projectedGrossUpper.toFixed(0)}
                     </Badge>
-                    <Badge variant="outline">
+                    <Badge variant='outline'>
                         VS Last Month:
                         <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().vsLastMonth > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonth.toFixed(2)}%
                         </span>
-                        <span className="mx-1">-</span>
+                        <span className='mx-1'>-</span>
                         <span className='' style={{ color: getMonthlyGrossAndProjected().vsLastMonthUpper > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonthUpper.toFixed(2)}%
                         </span>
@@ -305,69 +361,61 @@ export default function Home() {
             )}
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && (
-                <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <XAxis dataKey='date' />
-                    <YAxis type='number' domain={[Math.min(0, Math.round(Math.min(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 - 1) * 100), Math.round(Math.max(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 + 1) * 100]} />
-                    <Tooltip contentStyle={{ backgroundColor: "hsl(217.2 32.6% 17.5%)"}} />
-                    <Legend />
-                    <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
-                    {compareMode && <Line type='monotone' dataKey='lastMonthSubscribers' name='Subscribers (prev. Month)' key='lastMonthSubscribers' stroke='#ebba34' />}
-                    {compareMode && <Line type='monotone' dataKey='subscribersDelta' name='Subscribers Delta' key='subscribersDelta' stroke='#4d401e' />}
-                    <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' />
-                    {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' />}
-                    {compareMode && <Line type='monotone' dataKey='grossDelta' name='Gross Earnings Delta' key='grossDelta' stroke='#1e4d49' />}
-                </LineChart>
+                <>
+                    <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <XAxis dataKey='date' />
+                        <YAxis type='number' domain={[Math.min(0, Math.round(Math.min(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 - 1) * 100), Math.round(Math.max(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 + 1) * 100]} />
+                        <Tooltip contentStyle={{ backgroundColor: "hsl(217.2 32.6% 17.5%)" }} />
+                        <Legend />
+                        <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
+                        {compareMode && <Line type='monotone' dataKey='lastMonthSubscribers' name='Subscribers (prev. Month)' key='lastMonthSubscribers' stroke='#ebba34' />}
+                        {compareMode && <Line type='monotone' dataKey='subscribersDelta' name='Subscribers Delta' key='subscribersDelta' stroke='#4d401e' />}
+                        <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' />
+                        {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' />}
+                        {compareMode && <Line type='monotone' dataKey='grossDelta' name='Gross Earnings Delta' key='grossDelta' stroke='#1e4d49' />}
+                    </LineChart>
+
+                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Day of Week Subscriber Distribution</h1>
+                    <BarChart width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getDayOfWeekSubscriberDistribution()} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <XAxis dataKey='dayOfWeek' />
+                        <YAxis type='number' unit={"%"} />
+                        <Tooltip contentStyle={{ backgroundColor: "hsl(217.2 32.6% 17.5%)" }} />
+                        <Legend />
+                        <Bar dataKey='percent' name='Subscribers' fill='#ff0048' unit={"%"} />
+                    </BarChart>
+
+                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Monthly Gross Over Time</h1>
+                    
+                    <AreaChart id='allTimeGrowth' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getMonthlyGrossAndProjected().allTimeGrowth} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <XAxis dataKey='date' />
+                        <YAxis type='number' unit={currency} domain={[0, Math.round(Math.max(...getMonthlyGrossAndProjected().allTimeGrowth.map((subscriber) => subscriber.gross)) / 100 + 1) * 100]} />
+                        <Tooltip contentStyle={{ backgroundColor: "hsl(217.2 32.6% 17.5%)" }} />
+                        <Legend />
+                        <Area type='monotone' dataKey='gross' name='Gross Earnings' unit={currency} key='gross' stroke='#00ff1a' fill="#00ff1a" fillOpacity={0.3} />
+                    </AreaChart>
+
+                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Month on Month Growth</h1>
+
+                    <BarChart id="allTimeMonthlyGrowth" width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getMonthlyGrossAndProjected().allTimeGrowth.filter(s=>s.percentageGrowth !== 0)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <XAxis dataKey='date' />
+                        <YAxis type='number' unit={"%"} domain={[...getMinMax(getMonthlyGrossAndProjected().allTimeGrowth, "percentageGrowth", 10)]} />
+                        <ReferenceLine y={0} stroke="#fff" />
+                        <Tooltip contentStyle={{backgroundColor: "hsl(217.2 32.6% 17.5%)"}} />
+                        <Legend />
+                        <Bar dataKey='percentageGrowth' name='Month on Month Growth' fill='#0095ff' unit={"%"} />
+                    </BarChart>
+                </>
             )}
-
-            {!!insightsCSV.chart.length && (
-                <LineChart id='insights' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={insightsCSV.chart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <XAxis dataKey='MonthYear' />
-                    <YAxis type='number' />
-                    <Tooltip />
-                    <Legend />
-                    {insightsTableHeadersChecked.map((header) => (
-                        <Line type='monotone' dataKey={header} key={header} stroke={stringToColour(header)} />
-                    ))}
-                </LineChart>
-            )}
-
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        {insightsCSV.headers.map((header) => (
-                            <TableHead key={header}>
-                                <div className='flex items-center space-x-2'>
-                                    <Checkbox
-                                        checked={insightsTableHeadersChecked.includes(header)}
-                                        onCheckedChange={(checked) => {
-                                            const newHeaders = [...insightsTableHeadersChecked];
-                                            if (checked) {
-                                                newHeaders.push(header);
-                                            } else {
-                                                newHeaders.splice(newHeaders.indexOf(header), 1);
-                                            }
-                                            setInsightsTableHeadersChecked(newHeaders);
-                                        }}
-                                    />
-
-                                    <Label htmlFor={header}>{header}</Label>
-                                </div>
-                            </TableHead>
-                        ))}
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {insightsCSV.data.map((row) => (
-                        <TableRow key={row.join()}>
-                            {row.map((cell, index) => (
-                                <TableCell key={index}>{cell}</TableCell>
-                            ))}
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
         </main>
     );
+}
+
+function getMinMax(arr, key, roundingPad = 100) {
+    const min = Math.min(...arr.map((a) => parseFloat(a[key])));
+    const max = Math.max(...arr.map((a) => parseFloat(a[key])));
+    const minRounded = min - (roundingPad + min % roundingPad);
+    const maxRounded = max + (roundingPad - max % roundingPad);
+    return [minRounded, maxRounded];
 }
 
 const stringToColour = (str) => {
@@ -384,7 +432,7 @@ const stringToColour = (str) => {
 };
 
 function findMedian(arr) {
-    arr = arr.map(v => parseFloat(v));
+    arr = arr.map((v) => parseFloat(v));
     arr.sort((a, b) => a - b);
     const middleIndex = Math.floor(arr.length / 2);
 
