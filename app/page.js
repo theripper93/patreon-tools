@@ -370,9 +370,9 @@ export default function Home() {
                         <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
                         {compareMode && <Line type='monotone' dataKey='lastMonthSubscribers' name='Subscribers (prev. Month)' key='lastMonthSubscribers' stroke='#ebba34' />}
                         {compareMode && <Line type='monotone' dataKey='subscribersDelta' name='Subscribers Delta' key='subscribersDelta' stroke='#4d401e' />}
-                        <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' />
-                        {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' />}
-                        {compareMode && <Line type='monotone' dataKey='grossDelta' name='Gross Earnings Delta' key='grossDelta' stroke='#1e4d49' />}
+                        <Line type='monotone' dataKey='gross' name='Gross Earnings' key='gross' stroke='#00ff1a' unit={currency} />
+                        {compareMode && <Line type='monotone' dataKey='lastMonthGross' name='Gross Earnings (prev. Month)' key='lastMonthGross' stroke='#ff003c' unit={currency} />}
+                        {compareMode && <Line type='monotone' dataKey='grossDelta' name='Gross Earnings Delta' key='grossDelta' stroke='#1e4d49' unit={currency} />}
                     </LineChart>
 
                     <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Day of Week Subscriber Distribution</h1>
