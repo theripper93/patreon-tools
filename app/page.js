@@ -28,6 +28,7 @@ export default function Home() {
     const [currency, setCurrency] = useState("$");
     const [detailedEarningsCSV, setDetailedEarningsCSV] = useState({ headers: [], data: [], chart: [], subscribersPerDayChart: [] });
     const [dateRange, setDateRange] = useState("this-month");
+    const [year, setYear] = useState(null);
     const [excludeFirstDayOfMonth, setExcludeFirstDayOfMonth] = useState(true);
     const [compareMode, setCompareMode] = useState(false);
 
@@ -85,10 +86,13 @@ export default function Home() {
         const specialEventImpact = lastMonthGross - estimatedGrossLastMonth;
 
         const grossByMonthYear = {};
+
+        const years = [];
         detailedEarningsCSV.subscribersPerDayChart.forEach((subscriber) => {
-            const month = subscriber.month;
+            const month = subscriber.month + 1;
             const year = subscriber.year;
             const key = `${year}-${month}`;
+            if(!years.includes(year)) years.push(year);
             if (!grossByMonthYear[key]) {
                 grossByMonthYear[key] = parseFloat(subscriber.gross);
             } else {
@@ -112,23 +116,40 @@ export default function Home() {
 
         const vsLastMonthUpper = (projectedGrossUpper / lastMonthGross - 1) * 100;
 
-        const allTimeGrowth = Object.entries(grossByMonthYear).map(([key, value]) => {
+        let allTimeGrowth = Object.entries(grossByMonthYear).map(([key, value]) => {
             return {
                 date: new Date(key.replaceAll("-", "/")).toLocaleDateString("en-US", { year: "numeric", month: "long" }),
-                gross: value.toFixed(0)
+                gross: value.toFixed(0),
+                year: new Date(key.replaceAll("-", "/")).getFullYear()
             }
-        });
+        })
 
         allTimeGrowth.forEach((g, i) => {
             const prev = allTimeGrowth[i - 1];
-            if (!prev || !allTimeGrowth[i - 2] || !allTimeGrowth[i - 3]) {
+            if (!prev) {
                 g.percentageGrowth = 0;
                 return;
             }
             g.percentageGrowth = ((g.gross / prev.gross - 1) * 100).toFixed(2);
         })
 
-        return { allTimeGrowth, currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact, projectedGrossUpper, vsLastMonthUpper, medianGrowth: medianGrowth * 100 };
+        switch (year) {
+            case "all-time":
+                allTimeGrowth = allTimeGrowth;
+                break;
+            case "one-year":
+                allTimeGrowth = allTimeGrowth.splice(-12);
+                break;
+            case "two-years":
+                allTimeGrowth = allTimeGrowth.splice(-24);
+                break;
+            default:
+                allTimeGrowth = allTimeGrowth.filter((s) => s.year == year);
+                break;
+        }
+
+
+        return { years, allTimeGrowth, currentMonthGross, lastMonthGross, projectedGross: projectedGross + currentMonthGross, vsLastMonth, grossThisTimeLastMonth, specialEventImpact, projectedGrossUpper, vsLastMonthUpper, medianGrowth: medianGrowth * 100 };
     };
 
     const getDayOfWeekSubscriberDistribution = () => {
@@ -219,9 +240,12 @@ export default function Home() {
                                                     }
                                                 });
 
+                                                const uniqueYears = [];
+
                                                 const subscribersPerDayChart = Object.values(subscribersPerDay)
                                                     .map((subscriber) => {
                                                         const year = subscriber.year;
+                                                        if(!uniqueYears.includes(year)) uniqueYears.push(year);
                                                         const month = subscriber.month;
                                                         const day = subscriber.day;
                                                         const lastMonthSubscriber = Object.values(subscribersPerDay).find((subscriber) => subscriber.year === year && subscriber.month === month - 1 && subscriber.day === day);
@@ -233,7 +257,10 @@ export default function Home() {
                                                     })
                                                     .reverse();
                                                     subscribersPerDayChart.forEach(s => s.date = new Date(s.date.replaceAll("-", "/")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }));
-                                                setDetailedEarningsCSV({ headers, data, chart, subscribersPerDayChart });
+                                                if(uniqueYears.length >= 3) setYear("two-years");
+                                                else if (uniqueYears.length === 2) setYear("one-year");
+                                                else setYear("all-time");
+                                                setDetailedEarningsCSV({headers, data, chart, subscribersPerDayChart});
                                             };
                                             reader.readAsText(file);
                                         }
@@ -319,7 +346,7 @@ export default function Home() {
             </Table>
 
             {!!detailedEarningsCSV.subscribersPerDayChart.length && dateRange === "this-month" && (
-                <div className='flex flex-row justify-center items-center align-middle w-full gap-5 my-2 mb-4'>
+                <div className='flex flex-row flex-wrap justify-center items-center align-middle w-full gap-5 my-2 mb-4'>
                     <Badge variant='secondary'>
                         Special Event Impact Last Month: {currency}
                         {getMonthlyGrossAndProjected().specialEventImpact.toFixed(0)}
@@ -352,7 +379,7 @@ export default function Home() {
                         <span className='ml-1' style={{ color: getMonthlyGrossAndProjected().vsLastMonth > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonth.toFixed(2)}%
                         </span>
-                        <span className='mx-1'>-</span>
+                        <span className='mx-1'>|</span>
                         <span className='' style={{ color: getMonthlyGrossAndProjected().vsLastMonthUpper > 0 ? "lime" : "red" }}>
                             {getMonthlyGrossAndProjected().vsLastMonthUpper.toFixed(2)}%
                         </span>
@@ -384,7 +411,28 @@ export default function Home() {
                         <Bar dataKey='percent' name='Subscribers' fill='#ff0048' unit={"%"} />
                     </BarChart>
 
-                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Monthly Gross Over Time</h1>
+                    <div className='flex flex-row justify-center items-center align-middle w-full gap-5 my-2 mb-4 mt-12'>
+                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl'>Monthly Gross Over Time</h1>
+
+                    <Select value={year} onValueChange={(value) => {
+                        setYear(value);
+                    }}>
+                        <SelectTrigger className='w-[180px]'>
+                            <SelectValue placeholder='Select a Year' />
+                        </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all-time">All Time</SelectItem>
+                                <SelectItem value="one-year">One Year</SelectItem>
+                                <SelectItem value="two-years">Two Years</SelectItem>
+                            {getMonthlyGrossAndProjected().years.toReversed().map((year) => (
+                                <SelectItem value={year} key={year}>
+                                    {year}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                            
+                    </Select>
+                    </div>
                     
                     <AreaChart id='allTimeGrowth' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getMonthlyGrossAndProjected().allTimeGrowth} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                         <XAxis dataKey='date' />
@@ -394,9 +442,29 @@ export default function Home() {
                         <Area type='monotone' dataKey='gross' name='Gross Earnings' unit={currency} key='gross' stroke='#00ff1a' fill="#00ff1a" fillOpacity={0.3} />
                     </AreaChart>
 
-                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl mt-12'>Month on Month Growth</h1>
+                    <div className='flex flex-row justify-center items-center align-middle w-full gap-5 my-2 mb-4 mt-12'>
+                    <h1 className='scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl'>Month on Month Growth</h1>
 
-                    <BarChart id="allTimeMonthlyGrowth" width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getMonthlyGrossAndProjected().allTimeGrowth.filter(s=>s.percentageGrowth !== 0)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <Select value={year} onValueChange={(value) => {
+                        setYear(value);
+                    }}>
+                        <SelectTrigger className='w-[180px]'>
+                            <SelectValue placeholder='Select a Year' />
+                        </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all-time">All Time</SelectItem>
+                                <SelectItem value="one-year">One Year</SelectItem>
+                                <SelectItem value="two-years">Two Years</SelectItem>
+                            {getMonthlyGrossAndProjected().years.toReversed().map((year) => (
+                                <SelectItem value={year} key={year}>
+                                    {year}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                            
+                    </Select>
+                    </div>
+                    <BarChart id="allTimeMonthlyGrowth" width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={getMonthlyGrossAndProjected().allTimeGrowth} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                         <XAxis dataKey='date' />
                         <YAxis type='number' unit={"%"} domain={[...getMinMax(getMonthlyGrossAndProjected().allTimeGrowth, "percentageGrowth", 10)]} />
                         <ReferenceLine y={0} stroke="#fff" />
@@ -406,6 +474,7 @@ export default function Home() {
                     </BarChart>
                 </>
             )}
+            <p className="text-sm text-muted-foreground py-4">All the data uploaded to this page is only stored in memory and not persisted to any database or uploaded to any remote server.</p>
         </main>
     );
 }
