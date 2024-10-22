@@ -391,7 +391,19 @@ export default function Home() {
                 <>
                     <LineChart id='subscribersPerDay' width={window.innerWidth * 0.9} height={window.innerHeight * 0.7} data={detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter)} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                         <XAxis dataKey='date' />
-                        <YAxis type='number' domain={[Math.min(0, Math.round(Math.min(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 - 1) * 100), Math.round(Math.max(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 + 1) * 100]} />
+                        <YAxis type='number' domain={
+                            [
+                                Math.min(
+                                    0,
+                                    Math.round(
+                                        Math.min(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross).concat(compareMode ? detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.grossDelta) : [0])) / 100 - 1
+                                    ) * 100
+                                ),
+                                Math.round(
+                                    Math.max(...detailedEarningsCSV.subscribersPerDayChart.filter(dateFilter).map((subscriber) => subscriber.gross)) / 100 + 1
+                                ) * 100
+                            ]
+                        } />
                         <Tooltip contentStyle={{ backgroundColor: "hsl(217.2 32.6% 17.5%)" }} />
                         <Legend />
                         <Line type='monotone' dataKey='subscribers' name='Subscribers' key='subscribers' stroke='#0051ff' />
