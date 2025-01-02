@@ -66,7 +66,9 @@ export default function Home() {
     const getMonthlyGrossAndProjected = () => {
         const currentMonth = new Date().getMonth();
         const thisMonthData = detailedEarningsCSV.subscribersPerDayChart.filter((subscriber) => subscriber.month === currentMonth && subscriber.year === new Date().getFullYear());
-        const lastMonthData = detailedEarningsCSV.subscribersPerDayChart.filter((subscriber) => subscriber.month === currentMonth - 1 && subscriber.year === new Date().getFullYear());
+        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const lastYear = currentMonth === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+        const lastMonthData = detailedEarningsCSV.subscribersPerDayChart.filter((subscriber) => subscriber.month === lastMonth && subscriber.year === lastYear);
         const medianDailyGrossLastMonth = parseFloat(findMedian(lastMonthData.map((subscriber) => subscriber.gross).sort((a, b) => a - b)));
         const daysUntilEndOfMonth = 30 - Math.max(...thisMonthData.map((subscriber) => subscriber.day));
         const projectedGross = medianDailyGrossLastMonth * daysUntilEndOfMonth;
