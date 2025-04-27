@@ -114,7 +114,7 @@ export default function Home() {
 
         const medianGrowth = findMedian(monthByMonthGrowth);
 
-        const projectedGrossUpper = (projectedGross + currentMonthGross) * (1 + medianGrowth);
+        const projectedGrossUpper = (projectedGross + currentMonthGross) * (1 + medianGrowth * (daysUntilEndOfMonth / 30));
 
         const vsLastMonthUpper = (projectedGrossUpper / lastMonthGross - 1) * 100;
 
